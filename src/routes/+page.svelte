@@ -1,67 +1,69 @@
 <script lang="ts">
-	import ErrorMessage from '$lib/components/form/ErrorMessage.svelte';
 	import Field from '$lib/components/form/Field.svelte';
 	import Form from '$lib/components/form/Form.svelte';
 	import * as yup from 'yup';
 
-	let useDifferentBusinessName = false;
-	const initialValues = {
-		name: '',
-		phoneNumber: '',
-		businessName: ''
-	};
+	let isBusiness = false;
 
-	const validationSchemaBasic = yup.object().shape({
-		name: yup.string().required('Name is required'),
-		phoneNumber: yup.string().required('Phone number is required')
-	});
-
-	let validationSchema: yup.ObjectSchema<any>;
-
-	$: {
-		validationSchema = yup.object().shape({
-			...validationSchemaBasic.fields,
-			...(false ? { businessName: yup.string().required('Business name is required') } : {})
-		});
-	}
-
-	async function handleSubmit(values: typeof initialValues) {
+	function onSubmit(values: any) {
 		// Your custom submit logic here
-		console.log('handleSubmit called with values:', values);
+		console.log('Form submitted with values:', values);
 	}
 
-	function handleChange(values: any) {
-		//formValues = JSON.parse(JSON.stringify(values));
-		if (values.useDifferentBusinessName) {
-			useDifferentBusinessName = values.useDifferentBusinessName;
-		}
+	function onChange(values: any) {
+		// Handle value changes if needed
+		console.log('values:');
+		console.log(values);
 		return values;
 	}
 </script>
 
-<Form {initialValues} {validationSchema} onSubmit={handleSubmit} onChange={handleChange}>
+<Form {onSubmit} {onChange}>
 	<div>
-		<label for="name">Name2</label>
-		<Field name="name" />
-		<ErrorMessage name="name" />
+		<Field
+			label="Name"
+			name="name"
+			defaultValue=""
+			validation={async (value) =>
+				(await yup.string().required('Name is required').min(2, 'Name is too short').isValid(value))
+					? null
+					: 'Invalid name'}
+		/>
 	</div>
-
 	<div>
-		<label for="phoneNumber">Phone Number</label>
-		<Field name="phoneNumber" />
-		<ErrorMessage name="phoneNumber" />
+		<Field
+			label="Address"
+			name="address"
+			defaultValue=""
+			validation={async (value) =>
+				(await yup
+					.string()
+					.required('Address is required')
+					.min(2, 'Address is too short')
+					.isValid(value))
+					? null
+					: 'Invalid address'}
+		/>
 	</div>
-
 	<div>
-		<Field name="useDifferentBusinessName" type="checkbox" />
-		<label for="useDifferentBusinessName">Use different business name</label>
+		<input type="checkbox" bind:checked={isBusiness} />
+		<label for="isBusiness">Is Business?</label>
 	</div>
-
-	{#if useDifferentBusinessName}
+	{#if isBusiness}
 		<div>
-			<label for="businessName">Business Name</label>
-			<Field name="businessName" />
-			<ErrorMessage name="businessName" />
+			<Field
+				label="Business Address"
+				name="businessAddress"
+				defaultValue=""
+				validation={async (value) =>
+					(await yup
+						.string()
+						.required('Address is required')
+						.min(2, 'Address is too short')
+						.isValid(value))
+						? null
+						: 'Invalid business address'}
+			/>
 		</div>
 	{/if}
 	<button type="submit">Submit</button>

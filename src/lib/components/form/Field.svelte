@@ -1,26 +1,33 @@
 <script lang="ts">
-	import { getContext, onMount, onDestroy } from 'svelte';
-	import { CONTEXT_KEY_FORM, type IFormContext } from './formContext';
+	import { getContext, onDestroy, onMount } from 'svelte';
+	// import or define your own types
 
-	const { formValues, touchedFields, formErrors, handleBlur, handleChange } =
+	import { CONTEXT_KEY_FORM, type IFormContext, type IValidationFunction } from './types';
+
+	const { formValues, touchedFields, formErrors, handleBlur, handleChange, fieldValidations } =
 		getContext<IFormContext>(CONTEXT_KEY_FORM);
 
 	export let name: string;
 	export let type = 'text';
 	export let defaultValue: any = '';
 	export let label: string = '';
-	export let validation: () => string | null = () => null;
+	export let validation: IValidationFunction;
 
-	// Initialize field with default value
 	onMount(() => {
-		formValues.update((values) => ({ ...values, [name]: defaultValue }));
-		// Add validation rule to form context here
+		// Only update formValues with defaultValue if the field does not already exist
+		formValues.update((values) => {
+			if (values[name] === undefined) {
+				return { ...values, [name]: defaultValue };
+			}
+			return values; // Otherwise, keep the existing value
+		});
+		fieldValidations[name] = validation;
 	});
 
-	// Re-validate if validation function changes
-	$: {
-		// Add or update validation rule in form context here
-	}
+	onDestroy(() => {
+		// Remove the validation function when the component is destroyed
+		delete fieldValidations[name];
+	});
 </script>
 
 <div>

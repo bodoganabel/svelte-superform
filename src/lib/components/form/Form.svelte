@@ -1,46 +1,39 @@
 <script lang="ts">
 	import { getContext, setContext } from 'svelte';
 	import { writable } from 'svelte/store';
-	import type * as yup from 'yup';
-	import { CONTEXT_KEY_FORM, type IFormContext } from './formContext';
+	import { CONTEXT_KEY_FORM, type IFieldValidations, type IFormContext } from './types';
 
-	import { createEventDispatcher } from 'svelte';
-
-	const dispatch = createEventDispatcher();
-
-	export let initialValues: any = {};
-	export let validationSchema: yup.ObjectSchema<any>;
+	// Optional values which will be read from fields on mount event.
+	export let defaultValues: { [key: string]: any } = {};
 	export let onSubmit: (values: any) => void;
-	export let onChange:
-		| ((values: typeof initialValues) => { values: typeof initialValues })
-		| undefined = undefined;
+	export let onChange: ((values: any) => void) | undefined = undefined;
 
-	const formValues = writable(initialValues);
+	const formValues = writable<{ [key: string]: any }>(defaultValues);
 	const touchedFields = writable({});
 	const formErrors = writable({});
 
-	function validateField(name: string, value: any) {
-		try {
-			validationSchema.validateSyncAt(name, { [name]: value }, { abortEarly: false });
-			return '';
-		} catch (err: any) {
-			console.error('Validation error:', err);
-			return err.errors[0];
+	// Create an object to store validation functions from fields
+	const fieldValidations: IFieldValidations = {};
+
+	async function validateField(name: string, value: any) {
+		if (fieldValidations[name]) {
+			const errorMessage = await fieldValidations[name](value);
+			return errorMessage;
 		}
+		return '';
 	}
 
-	function handleBlur(event: any) {
-		console.log('Blurred:', event.target.name);
+	async function handleBlur(event: any) {
 		const { name, value } = event.target;
 		touchedFields.update((fields) => ({ ...fields, [name]: true }));
+		const errorMessage = await validateField(name, value);
 		formErrors.update((errors) => ({
 			...errors,
-			[name]: validateField(name, value)
+			[name]: errorMessage
 		}));
 	}
 
 	async function handleChange(event: any) {
-		console.log('Changed:', event.target.name);
 		const { name, value } = event.target;
 		formValues.update((values) => ({ ...values, [name]: value }));
 		const updatedValues = onChange ? await onChange($formValues) : $formValues;
@@ -49,21 +42,42 @@
 		}
 	}
 
+	async function handleSubmit() {
+		let isValid = true;
+		const currentErrors: { [key: string]: string | null } = {};
+		const currentTouchedFields: { [key: string]: boolean } = {};
+		// Loop through all registered fields and validate them
+		for (const [fieldName, validationFn] of Object.entries(fieldValidations)) {
+			currentTouchedFields[fieldName] = true;
+			const fieldValue = $formValues[fieldName];
+			const errorMessage = await validateField(fieldName, fieldValue);
+			if (errorMessage) {
+				isValid = false;
+				currentErrors[fieldName] = errorMessage;
+			}
+		}
+		touchedFields.update((fields) => ({ ...currentTouchedFields }));
+		// Update the form errors
+		formErrors.set(currentErrors);
+
+		// Only submit the form if all fields are valid
+		if (isValid) {
+			onSubmit($formValues);
+		}
+	}
+
 	setContext<IFormContext>(CONTEXT_KEY_FORM, {
 		formValues,
 		touchedFields,
 		formErrors,
 		handleBlur,
-		handleChange
+		handleChange,
+		fieldValidations
 	});
 
-	$: {
-		console.log('Form values:', $formValues);
-		console.log('Touched fields:', $touchedFields);
-		console.log('Form errors:', $formErrors);
-	}
+	// ...
 </script>
 
-<div on:submit|preventDefault={onSubmit}>
+<form on:submit|preventDefault={handleSubmit}>
 	<slot />
-</div>
+</form>
